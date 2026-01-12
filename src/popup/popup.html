@@ -76,7 +76,9 @@
 
     .dashboard-actions { width: 100%; display: flex; flex-direction: column; gap: 8px; }
     .btn-claim { background: #1a1a1a; font-size: 12px; }
-    .btn-withdraw { background: #eee; color: #999; cursor: not-allowed; border: none; padding: 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+    .btn-withdraw { background: #065fd4; color: white; border: none; padding: 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .btn-withdraw:active { opacity: 0.8; }
+    .btn-withdraw:disabled { background: #eee; color: #999; cursor: not-allowed; }
 
     footer { margin-top: 24px; font-size: 11px; }
     footer a { color: #065fd4; text-decoration: none; font-weight: 500; }
@@ -116,7 +118,7 @@
       
       <div class="dashboard-actions">
         <button id="claim-button" class="btn-primary btn-claim">Claim YouTube Channel</button>
-        <button class="btn-withdraw">Withdraw Funds</button>
+        <button id="withdraw-button" class="btn-withdraw">Withdraw Funds</button>
         <button id="logout-button" class="btn-secondary">Disconnect</button>
       </div>
     </div>

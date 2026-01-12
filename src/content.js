@@ -5,12 +5,17 @@ if (window.tipmnee_content_loaded) {
     console.log('TipMNEE: Content script loaded');
 
     // 1. Inject inpage.js into the main world (Needed for Wallet access everywhere)
-    const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('dist/inpage.bundle.js');
-    script.onload = function() {
-      this.remove();
-    };
-    (document.head || document.documentElement).appendChild(script);
+    async function injectInpage() {
+      const { tipmnee_config } = await chrome.storage.local.get('tipmnee_config');
+      const script = document.createElement('script');
+      script.src = chrome.runtime.getURL('dist/inpage.bundle.js');
+      script.setAttribute('data-config', JSON.stringify(tipmnee_config || {}));
+      script.onload = function() {
+        this.remove();
+      };
+      (document.head || document.documentElement).appendChild(script);
+    }
+    injectInpage();
 
     // 2. Messaging Bridge 
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -25,6 +30,9 @@ if (window.tipmnee_content_loaded) {
         window.addEventListener('TIPMNEE_CHANNEL_ID_FOUND', onIdFound);
         window.dispatchEvent(new CustomEvent('TIPMNEE_CLAIM_REQUEST'));
         return true; 
+      } else if (request.action === 'WITHDRAW_REQUEST') {
+        window.dispatchEvent(new CustomEvent('TIPMNEE_WITHDRAW_REQUEST', { detail: { channelId: request.channelId } }));
+        sendResponse({ status: 'initiated' });
       }
     });
 
@@ -56,6 +64,10 @@ if (window.tipmnee_content_loaded) {
         }
 
         try {
+            const { tipmnee_config } = await chrome.storage.local.get('tipmnee_config');
+            // Ensure chainId is an integer for the Go backend
+            const chainId = parseInt(tipmnee_config?.chain_id || '11155111', 10);
+
             const resp = await fetch(`${API_BASE_URL}/api/ledger/deposit`, {
                 method: 'POST',
                 headers: { 
@@ -65,7 +77,7 @@ if (window.tipmnee_content_loaded) {
                 body: JSON.stringify({
                     tx_hash: payload.tx_hash,
                     channel_id: payload.channel_id,
-                    chain_id: 11155111
+                    chain_id: chainId
                 })
             });
             
@@ -80,6 +92,76 @@ if (window.tipmnee_content_loaded) {
         } catch (e) {
             console.error('TipMNEE: Network error notifying ledger:', e);
             alert('Network Error: Could not connect to backend.');
+        }
+    });
+
+    window.addEventListener('TIPMNEE_WITHDRAWAL_COMPLETED', async (event) => {
+        const payload = event.detail;
+        console.log('TipMNEE Content: Withdrawal completed, notifying backend...', payload);
+
+        const { tipmnee_token } = await chrome.storage.local.get('tipmnee_token');
+        if (!tipmnee_token) return;
+
+        try {
+            const { tipmnee_config } = await chrome.storage.local.get('tipmnee_config');
+            // Ensure chainId is an integer for the Go backend
+            const chainId = parseInt(tipmnee_config?.chain_id || '11155111', 10);
+
+            const resp = await fetch(`${API_BASE_URL}/api/ledger/withdrawal`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Authorization': `Bearer ${tipmnee_token}` 
+                },
+                body: JSON.stringify({
+                    tx_hash: payload.tx_hash,
+                    channel_id: payload.channel_id,
+                    chain_id: chainId
+                })
+            });
+            
+            if (resp.ok) {
+                console.log('TipMNEE: Withdrawal registered successfully.');
+            } else {
+                console.error('TipMNEE: Failed to notify withdrawal to backend');
+            }
+        } catch (e) {
+            console.error('TipMNEE: Network error notifying withdrawal:', e);
+        }
+    });
+
+    window.addEventListener('TIPMNEE_REQUEST_CLAIM_SIGNATURE', async (event) => {
+        const { channelId, payoutAddress } = event.detail;
+        console.log('TipMNEE Content: Requesting claim signature for:', channelId, payoutAddress);
+
+        const { tipmnee_token } = await chrome.storage.local.get('tipmnee_token');
+        if (!tipmnee_token) {
+            window.dispatchEvent(new CustomEvent('TIPMNEE_CLAIM_SIGNATURE_RECEIVED', { detail: { error: 'Not logged in' } }));
+            return;
+        }
+
+        try {
+            const resp = await fetch(`${API_BASE_URL}/api/claims/youtube`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Authorization': `Bearer ${tipmnee_token}` 
+                },
+                body: JSON.stringify({
+                    channel_id: channelId,
+                    payout_address: payoutAddress
+                })
+            });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                window.dispatchEvent(new CustomEvent('TIPMNEE_CLAIM_SIGNATURE_RECEIVED', { detail: data }));
+            } else {
+                const err = await resp.json();
+                window.dispatchEvent(new CustomEvent('TIPMNEE_CLAIM_SIGNATURE_RECEIVED', { detail: { error: err.error || 'Failed to get signature' } }));
+            }
+        } catch (e) {
+            window.dispatchEvent(new CustomEvent('TIPMNEE_CLAIM_SIGNATURE_RECEIVED', { detail: { error: 'Connection failed' } }));
         }
     });
 

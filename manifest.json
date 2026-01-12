@@ -40,7 +40,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["dist/inpage.bundle.js"],
+      "resources": ["dist/inpage.bundle.js", "src/content.css"],
       "matches": ["<all_urls>"]
     }
   ]
