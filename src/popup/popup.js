@@ -88,7 +88,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (verifyRes.ok) {
-          chrome.storage.local.set({ tipmnee_is_youtube_verified: true }, () => {
+          chrome.storage.local.set({ 
+            tipmnee_is_youtube_verified: true,
+            tipmnee_youtube_channel_id: autoChannelId 
+          }, () => {
             alert('Success! Your YouTube account (' + autoChannelId + ') is now linked.');
             showDashboard(); // Refresh UI
           });
@@ -120,13 +123,23 @@ document.addEventListener('DOMContentLoaded', () => {
     loginView.style.display = 'none';
     dashboardView.style.display = 'block';
     
-    const { tipmnee_token, tipmnee_is_youtube_verified } = await chrome.storage.local.get(['tipmnee_token', 'tipmnee_is_youtube_verified']);
+    const { 
+        tipmnee_token, 
+        tipmnee_is_youtube_verified, 
+        tipmnee_youtube_channel_id 
+    } = await chrome.storage.local.get(['tipmnee_token', 'tipmnee_is_youtube_verified', 'tipmnee_youtube_channel_id']);
     
-    // Hide claim button if already verified
+    // UI Updates for Verification State
+    const channelContainer = document.getElementById('connected-channel-container');
+    const channelDisplay = document.getElementById('connected-channel-display');
+
     if (tipmnee_is_youtube_verified) {
       if (claimButton) claimButton.style.display = 'none';
+      if (channelContainer) channelContainer.style.display = 'block';
+      if (channelDisplay) channelDisplay.textContent = tipmnee_youtube_channel_id || 'Verified';
     } else {
       if (claimButton) claimButton.style.display = 'block';
+      if (channelContainer) channelContainer.style.display = 'none';
     }
 
     const res = await fetch(`${API_BASE_URL}/api/me/earnings`, {
