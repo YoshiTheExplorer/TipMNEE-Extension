@@ -7,7 +7,7 @@ if (window.tipmnee_inpage_loaded) {
     window.tipmnee_inpage_loaded = true;
 
     const TOKEN_ADDRESS = '0x1c7d4b196cb0c7b01d743fbc6116a902379c7238'.toLowerCase(); 
-    const ESCROW_ADDRESS = '0x327f29235e589f2977f5b667356c198d02ad00c0'.toLowerCase();
+    const ESCROW_ADDRESS = '0x78B738bbdfa6efDdb817ffCf731F352fe5f780DF'.toLowerCase();
     const API_BASE_URL = 'http://localhost:8080';
 
     function getChannelIdFromPage() {
@@ -67,6 +67,10 @@ if (window.tipmnee_inpage_loaded) {
     window.addEventListener('TIPMNEE_SEND_TIP', async (event) => {
       const { amount, message } = event.detail;
       const channelId = getChannelIdFromPage();
+      if (!channelId) {
+          alert('Error: Could not determine the YouTube Channel ID for this video.');
+          return;
+      }
       
       try {
         const provider = new BrowserProvider(window.ethereum);

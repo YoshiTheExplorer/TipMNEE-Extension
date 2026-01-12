@@ -56,25 +56,30 @@ if (window.tipmnee_content_loaded) {
         }
 
         try {
-            const resp = await fetch(`${API_BASE_URL}/api/ledger/notify`, {
+            const resp = await fetch(`${API_BASE_URL}/api/ledger/deposit`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json', 
                     'Authorization': `Bearer ${tipmnee_token}` 
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    tx_hash: payload.tx_hash,
+                    channel_id: payload.channel_id,
+                    chain_id: 11155111
+                })
             });
             
             if (resp.ok) {
                 console.log('TipMNEE: Ledger notified successfully.');
-                alert('Tip Successfully Registered! Your dashboard will update shortly.');
+                alert('Success! Tip sent and registered.');
             } else {
-                const err = await resp.text();
-                console.error('TipMNEE: Failed to notify ledger:', err);
-                alert('Transaction confirmed but registration failed. Please contact support.');
+                const errData = await resp.json();
+                console.error('TipMNEE: Failed to notify ledger:', errData);
+                alert('Registration Failed: ' + (errData.error || 'Check server logs'));
             }
         } catch (e) {
             console.error('TipMNEE: Network error notifying ledger:', e);
+            alert('Network Error: Could not connect to backend.');
         }
     });
 
