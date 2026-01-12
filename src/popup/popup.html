@@ -5,9 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TipMNEE</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      width: 320px;
+      width: 250px; /* Increased slightly */
       padding: 16px;
       margin: 0;
       background-color: #f9f9f9;
@@ -18,55 +21,53 @@
       flex-direction: column;
       align-items: center;
       text-align: center;
+      width: 100%;
     }
     header {
       margin-bottom: 20px;
-    }
-    h1 {
-      margin: 0;
-      font-size: 24px;
-      color: #FF0000; /* YouTube Red */
-    }
-    .subtitle {
-      margin: 4px 0 0;
-      font-size: 14px;
-      color: #666;
-    }
-    .btn-primary {
-      background-color: #065fd4;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 18px;
-      font-size: 14px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       width: 100%;
-      margin-bottom: 8px;
-    }
-    .btn-primary:hover {
-      background-color: #0056b3;
-    }
-    .helper-text {
-      font-size: 12px;
-      color: #888;
     }
     .user-card {
       background: white;
-      padding: 16px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
       width: 100%;
       margin-bottom: 16px;
+      text-align: center;
     }
-    code {
-      background: #eee;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      word-break: break-all;
+    .card-label {
+        font-size: 12px;
+        color: #666;
+        margin: 0 0 4px 0;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+    .earnings-amount {
+        font-size: 36px;
+        margin: 0 0 16px 0;
+        color: #065fd4;
+        font-weight: 700;
+    }
+    .stats-row {
+        display: flex;
+        justify-content: center;
+        gap: 32px;
+        border-top: 1px solid #eee;
+        padding-top: 12px;
+    }
+    .stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .stat-label {
+        font-size: 10px;
+        color: #888;
+    }
+    .stat-value {
+        font-size: 14px;
+        font-weight: 500;
     }
     .btn-secondary {
       background: #eee;
@@ -104,11 +105,23 @@
     <!-- Dashboard View (Hidden by default) -->
     <div id="dashboard-view" style="display: none;">
       <div class="user-card">
-        <p><strong>Welcome back!</strong></p>
-        <code id="user-id-display">User-ID</code>
+        <p class="card-label">Total Earned</p>
+        <h2 id="total-earned-display" class="earnings-amount">$0.00</h2>
+        
+        <div class="stats-row">
+            <div class="stat-item">
+                <span class="stat-label">Pending</span>
+                <span id="pending-display" class="stat-value">0.00</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Withdrawn</span>
+                <span id="withdrawn-display" class="stat-value">0.00</span>
+            </div>
+        </div>
       </div>
       
       <div class="dashboard-actions">
+        <button id="claim-button" class="btn-primary">Claim Youtube Account</button>
         <button id="logout-button" class="btn-secondary">Logout</button>
       </div>
     </div>

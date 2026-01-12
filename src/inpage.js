@@ -205,3 +205,20 @@ window.addEventListener('TIPMNEE_SEND_TIP', async (event) => {
     alert('TipMNEE Action Failed: ' + (error.shortMessage || error.message));
   }
 });
+
+// --- Claim Flow ---
+
+window.addEventListener('TIPMNEE_CLAIM_REQUEST', async () => {
+    console.log('TipMNEE: Claim Request Received');
+    const channelId = getChannelIdFromPage();
+
+    if (!channelId) {
+        alert('Could not find YouTube Channel ID. Make sure you are on a video or channel page.');
+        return;
+    }
+
+    console.log('TipMNEE: Claiming channel:', channelId);
+    
+    // Placeholder logic: You can add a fetch to POST /api/me/claim here
+    alert('Found Channel ID: ' + channelId + '\nClaim logic implementation pending...');
+});

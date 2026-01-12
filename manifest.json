@@ -1,12 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "TipMNEE Extension Template",
+  "name": "TipMNEE",
   "version": "1.0",
   "description": "A simple Chrome Extension template.",
   "permissions": [
     "activeTab",
     "storage",
     "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "src/popup/popup.html",
@@ -22,7 +25,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://www.youtube.com/*"],
+      "matches": ["<all_urls>"],
       "js": ["src/content.js"],
       "css": ["src/content.css"],
       "run_at": "document_end"
@@ -31,7 +34,7 @@
   "web_accessible_resources": [
     {
       "resources": ["dist/inpage.bundle.js"],
-      "matches": ["*://www.youtube.com/*"]
+      "matches": ["<all_urls>"]
     }
   ]
 }
