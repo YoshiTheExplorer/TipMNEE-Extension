@@ -1,70 +1,30 @@
 const API_BASE_URL = 'http://localhost:8080';
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('TipMNEE Popup: Loaded');
   const loginView = document.getElementById('login-view');
   const dashboardView = document.getElementById('dashboard-view');
-  
   const authButton = document.getElementById('auth-button');
   const logoutButton = document.getElementById('logout-button');
   const claimButton = document.getElementById('claim-button');
 
-  // Check Login State
   chrome.storage.local.get(['tipmnee_is_logged_in', 'tipmnee_userid'], (result) => {
-    if (result.tipmnee_is_logged_in) {
-      showDashboard(result.tipmnee_userid);
-    } else {
-      showLogin();
-    }
+    if (result.tipmnee_is_logged_in) showDashboard();
+    else showLogin();
   });
 
-  // Login Action (Blockchain)
   if (authButton) {
     authButton.addEventListener('click', async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
-      if (!tab || !tab.id || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) {
-        alert('This extension cannot run on this page.');
-        return;
+      if (!tab || !tab.id || !tab.url || tab.url.startsWith('chrome://')) {
+        alert('Cannot run on this page.'); return;
       }
-
-      // Helper to send message with retry
-      const ensureConnection = () => {
-        chrome.tabs.sendMessage(tab.id, { action: 'LOGIN_REQUEST' }, (response) => {
-          if (chrome.runtime.lastError) {
-            console.log('TipMNEE: Content script not found, injecting...');
-            // Inject content script if it's missing (e.g., after extension reload)
-            chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              files: ['src/content.js']
-            }, () => {
-              if (chrome.runtime.lastError) {
-                console.error('Injection failed:', chrome.runtime.lastError.message);
-                alert('Please refresh the page to connect your wallet.');
-              } else {
-                // Wait a tiny bit for the script to initialize then try again
-                setTimeout(() => {
-                  chrome.tabs.sendMessage(tab.id, { action: 'LOGIN_REQUEST' });
-                }, 200);
-              }
-            });
-          } else {
-            console.log('TipMNEE: Login request sent successfully');
-          }
-        });
-      };
-
-      ensureConnection();
+      chrome.tabs.sendMessage(tab.id, { action: 'LOGIN_REQUEST' });
     });
   }
 
-  // Claim YouTube Action (Global/OAuth)
   if (claimButton) {
     claimButton.addEventListener('click', async () => {
       try {
-        console.log('TipMNEE: Starting global claim flow...');
-        
-        // 1. Get Google OAuth Token
         const googleToken = await new Promise((resolve, reject) => {
           chrome.identity.getAuthToken({ interactive: true }, (token) => {
             if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
@@ -72,12 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         });
 
-        // 2. Automatically find the Channel ID using the token
-        console.log('TipMNEE: Discovering your YouTube channel...');
         const ytResp = await fetch('https://www.googleapis.com/youtube/v3/channels?part=id&mine=true', {
             headers: { 'Authorization': `Bearer ${googleToken}` }
         });
-        
         const ytData = await ytResp.json();
         
         if (!ytData.items || ytData.items.length === 0) {
@@ -85,9 +42,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const autoChannelId = ytData.items[0].id;
-        console.log('TipMNEE: Found Channel ID:', autoChannelId);
+        
+        // CRITICAL CHECK: Ensure ID isn't empty
+        if (!autoChannelId) {
+            throw new Error('Discovered Channel ID is empty. Google API returned invalid data.');
+        }
 
-        // 3. Call your Backend Verify endpoint
+        console.log('TipMNEE: Sending verify request for ID:', autoChannelId);
+
         const { tipmnee_token } = await chrome.storage.local.get('tipmnee_token');
         const verifyRes = await fetch(`${API_BASE_URL}/api/social/youtube/verify`, {
           method: 'POST',
@@ -104,8 +66,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (verifyRes.ok) {
           alert('Success! Your YouTube account (' + autoChannelId + ') is now linked.');
         } else {
-          const err = await verifyRes.json();
-          alert('Verification Failed: ' + (err.error || 'Unknown error'));
+          const errData = await verifyRes.json();
+          console.error('TipMNEE: Verification backend error:', errData);
+          alert('Verification Failed: ' + (errData.error || 'Unknown error'));
         }
 
       } catch (err) {
@@ -115,16 +78,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Logout Action
   if (logoutButton) {
     logoutButton.addEventListener('click', () => {
-      chrome.storage.local.remove(['tipmnee_is_logged_in', 'tipmnee_token', 'tipmnee_userid'], () => {
-        showLogin();
-      });
+      chrome.storage.local.remove(['tipmnee_is_logged_in', 'tipmnee_token', 'tipmnee_userid'], () => showLogin());
     });
   }
 
-  // Helpers
   function formatCurrency(raw) {
     const val = parseFloat(raw || "0") / 1e18;
     return "$" + val.toLocaleString('en-US', { minimumFractionDigits: 2 });
