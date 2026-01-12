@@ -112,8 +112,41 @@ window.addEventListener('TIPMNEE_SEND_TIP', async (event) => {
     await tipTx.wait();
     console.log('TipMNEE: Tip Confirmed!');
 
+    // 8. Notify Backend
+    const API_BASE_URL = 'http://localhost:8080'; // TODO: Update this to your production API URL
+    const payload = {
+      tx_hash: tipTx.hash,
+      channel_id: channelId,
+      chain_id: Number(network.chainId)
+    };
+
+    console.log('TipMNEE: Notifying backend...', payload);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ledger/deposit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.statusText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('TipMNEE: Backend notification successful', responseData);
+      alert('Success! Tip sent and registered.');
+      
+    } catch (apiError) {
+      console.error('TipMNEE: Failed to notify backend', apiError);
+      alert('Tip sent, but failed to register with backend. Please contact support with Tx Hash: ' + tipTx.hash);
+    }
+
   } catch (error) {
     console.error('TipMNEE: Transaction failed', error);
     alert('TipMNEE Action Failed: ' + (error.shortMessage || error.message));
   }
 });
+
