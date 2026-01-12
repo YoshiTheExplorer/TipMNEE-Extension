@@ -30,7 +30,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/inpage.js"],
+      "resources": ["dist/inpage.bundle.js"],
       "matches": ["*://www.youtube.com/*"]
     }
   ]

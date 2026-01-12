@@ -2,7 +2,7 @@ console.log('TipMNEE: Content script loaded for YouTube');
 
 // Inject inpage.js into the main world
 const script = document.createElement('script');
-script.src = chrome.runtime.getURL('src/inpage.js');
+script.src = chrome.runtime.getURL('dist/inpage.bundle.js');
 script.onload = function() {
   this.remove(); // Clean up script tag after loading
 };
@@ -45,7 +45,6 @@ function createModal() {
   document.getElementById('tipmnee-confirm').addEventListener('click', () => {
     const amount = document.getElementById('tipmnee-amount').value;
     const message = document.getElementById('tipmnee-message').value;
-    
     // Dispatch event to inpage.js
     window.dispatchEvent(new CustomEvent('TIPMNEE_SEND_TIP', {
       detail: { amount, message }
@@ -60,8 +59,9 @@ function createModal() {
   });
 }
 
+
 function openModal() {
-  createModal(); // Ensure it exists
+  createModal(); 
   const modal = document.getElementById(MODAL_ID);
   if (modal) modal.classList.add('open');
 }
