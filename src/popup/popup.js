@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         });
 
-        const ytResp = await fetch('https://www.googleapis.com/youtube/v3/channels?part=id&mine=true', {
+        const ytResp = await fetch('https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true', {
             headers: { 'Authorization': `Bearer ${googleToken}` }
         });
         const ytData = await ytResp.json();
@@ -66,6 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const autoChannelId = ytData.items[0].id;
+        const channelTitle = ytData.items[0].snippet.title;
+        const channelHandle = ytData.items[0].snippet.customUrl || ''; // E.g. @username
         
         // CRITICAL CHECK: Ensure ID isn't empty
         if (!autoChannelId) {
@@ -90,9 +92,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (verifyRes.ok) {
           chrome.storage.local.set({ 
             tipmnee_is_youtube_verified: true,
-            tipmnee_youtube_channel_id: autoChannelId 
+            tipmnee_youtube_channel_id: autoChannelId,
+            tipmnee_youtube_channel_name: channelTitle,
+            tipmnee_youtube_handle: channelHandle
           }, () => {
-            alert('Success! Your YouTube account (' + autoChannelId + ') is now linked.');
+            alert('Success! Your YouTube account (' + channelTitle + ') is now linked.');
             showDashboard(); // Refresh UI
           });
         } else {
@@ -126,8 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const { 
         tipmnee_token, 
         tipmnee_is_youtube_verified, 
-        tipmnee_youtube_channel_id 
-    } = await chrome.storage.local.get(['tipmnee_token', 'tipmnee_is_youtube_verified', 'tipmnee_youtube_channel_id']);
+        tipmnee_youtube_channel_id,
+        tipmnee_youtube_channel_name,
+        tipmnee_youtube_handle
+    } = await chrome.storage.local.get(['tipmnee_token', 'tipmnee_is_youtube_verified', 'tipmnee_youtube_channel_id', 'tipmnee_youtube_channel_name', 'tipmnee_youtube_handle']);
     
     // UI Updates for Verification State
     const channelContainer = document.getElementById('connected-channel-container');
@@ -136,7 +142,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tipmnee_is_youtube_verified) {
       if (claimButton) claimButton.style.display = 'none';
       if (channelContainer) channelContainer.style.display = 'block';
-      if (channelDisplay) channelDisplay.textContent = tipmnee_youtube_channel_id || 'Verified';
+      
+      let displayName = tipmnee_youtube_channel_name || 'Verified Channel';
+      if (tipmnee_youtube_handle) displayName += ` (${tipmnee_youtube_handle})`;
+      if (channelDisplay) channelDisplay.textContent = displayName;
     } else {
       if (claimButton) claimButton.style.display = 'block';
       if (channelContainer) channelContainer.style.display = 'none';
