@@ -24,6 +24,71 @@ function getChannelIdFromPage() {
   }
 }
 
+// --- Login Flow ---
+
+window.addEventListener('TIPMNEE_LOGIN_REQUEST', async () => {
+  console.log('TipMNEE: Login Request Received');
+  const API_BASE_URL = 'http://localhost:8080';
+
+  if (!window.ethereum) {
+    alert('MetaMask is not installed!');
+    return;
+  }
+
+  try {
+    const provider = new BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const address = await signer.getAddress();
+
+    console.log('TipMNEE: Authenticating address:', address);
+
+    // 1. Get Challenge Message
+    const msgResp = await fetch(`${API_BASE_URL}/api/auth/wallet/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address })
+    });
+    
+    if (!msgResp.ok) throw new Error('Failed to get auth message');
+    const { message } = await msgResp.json();
+    console.log('TipMNEE: Challenge Message:', message);
+
+    // 2. Sign Message
+    const signature = await signer.signMessage(message);
+    console.log('TipMNEE: Signature:', signature);
+
+    // 3. Login
+    const loginResp = await fetch(`${API_BASE_URL}/api/auth/wallet`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address, signature })
+    });
+
+    if (!loginResp.ok) {
+       const errorText = await loginResp.text();
+       throw new Error(`Login failed (${loginResp.status}): ${errorText}`);
+    }
+    const authData = await loginResp.json(); // Expected: { AccessToken, UserID }
+    
+    console.log('TipMNEE: Login Successful', authData);
+
+    // 4. Send Success Event back to ContentScript
+    window.dispatchEvent(new CustomEvent('TIPMNEE_LOGIN_SUCCESS', {
+      detail: authData
+    }));
+    
+    alert('Logged in successfully!');
+
+  } catch (error) {
+    console.error('TipMNEE: Login Error', error);
+    alert('Login Failed: ' + error.message);
+    
+    window.dispatchEvent(new CustomEvent('TIPMNEE_LOGIN_FAILURE', {
+      detail: { error: error.message }
+    }));
+  }
+});
+
 // --- Main Event Listener ---
 
 window.addEventListener('TIPMNEE_SEND_TIP', async (event) => {
@@ -69,19 +134,10 @@ window.addEventListener('TIPMNEE_SEND_TIP', async (event) => {
     const amountBigInt = parseUnits(amount, 18); // Assuming 18 decimals
 
     // 5. Hash Channel ID 
-    // Contract logic assumed: keccak256(abi.encodePacked(channelId))
-    // In Solidity: channelHash("UC...") -> keccak256(bytes("UC..."))
-    // In Ethers: keccak256(toUtf8Bytes(channelId))
-    // Wait, the ABI has a helper function `channelHash(string)`. We can use that if we want to be 100% sure.
-    // BUT pure functions call requires read, we can just compute it locally to save a call.
-    // Solidity: keccak256(abi.encodePacked(str)) == Ethers: keccak256(toUtf8Bytes(str))
-    
-    // NOTE (Important): The previous user request mentioned `channelHash` function in contract.
-    // Let's compute it locally as it's faster/cheaper.
     const channelIdHash = keccak256(toUtf8Bytes(channelId));
     console.log('TipMNEE: Computed Channel Hash:', channelIdHash);
 
-    // 6. Check Allowance (Optional optimization, but good practice)
+    // 6. Check Allowance 
     const currentAllowance = await tokenContract.allowance(signer.address, ESCROW_ADDRESS);
     console.log('TipMNEE: Current Allowance:', currentAllowance.toString());
 
@@ -149,4 +205,3 @@ window.addEventListener('TIPMNEE_SEND_TIP', async (event) => {
     alert('TipMNEE Action Failed: ' + (error.shortMessage || error.message));
   }
 });
-

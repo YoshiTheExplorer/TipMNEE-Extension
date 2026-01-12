@@ -4,12 +4,118 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TipMNEE</title>
-  <link rel="stylesheet" href="popup.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      width: 320px;
+      padding: 16px;
+      margin: 0;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    header {
+      margin-bottom: 20px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      color: #FF0000; /* YouTube Red */
+    }
+    .subtitle {
+      margin: 4px 0 0;
+      font-size: 14px;
+      color: #666;
+    }
+    .btn-primary {
+      background-color: #065fd4;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 18px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+    .btn-primary:hover {
+      background-color: #0056b3;
+    }
+    .helper-text {
+      font-size: 12px;
+      color: #888;
+    }
+    .user-card {
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      width: 100%;
+      margin-bottom: 16px;
+    }
+    code {
+      background: #eee;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .btn-secondary {
+      background: #eee;
+      color: #333;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    footer {
+      margin-top: 20px;
+      font-size: 12px;
+    }
+    footer a {
+      color: #065fd4;
+      text-decoration: none;
+    }
+  </style>
 </head>
 <body>
   <div class="container">
-    <h1>TipMNEE</h1>
-    <button id="actionButton">Login With Wallet</button>
+    <header>
+      <h1>TipMNEE</h1>
+      <p class="subtitle">Support your favorite creators</p>
+    </header>
+
+    <!-- Login View -->
+    <div id="login-view">
+      <button id="auth-button" class="btn-primary">
+        <span>🦊</span> &nbsp; Login with Wallet
+      </button>
+      <p class="helper-text">Connect MetaMask to start tipping</p>
+    </div>
+
+    <!-- Dashboard View (Hidden by default) -->
+    <div id="dashboard-view" style="display: none;">
+      <div class="user-card">
+        <p><strong>Welcome back!</strong></p>
+        <code id="user-id-display">User-ID</code>
+      </div>
+      
+      <div class="dashboard-actions">
+        <button id="logout-button" class="btn-secondary">Logout</button>
+      </div>
+    </div>
+
+    <footer>
+      <a href="#" id="help-link">Need Help?</a>
+    </footer>
   </div>
   <script src="popup.js"></script>
 </body>

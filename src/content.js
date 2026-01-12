@@ -8,6 +8,44 @@ script.onload = function() {
 };
 (document.head || document.documentElement).appendChild(script);
 
+// 1. Listen for messages from Popup
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'LOGIN_REQUEST') {
+    console.log('TipMNEE Content: Forwarding Login Request to Page');
+    window.dispatchEvent(new CustomEvent('TIPMNEE_LOGIN_REQUEST'));
+    sendResponse({ status: 'initiated' });
+  }
+});
+
+// 2. Listen for Success from Inpage
+window.addEventListener('TIPMNEE_LOGIN_SUCCESS', (event) => {
+  console.log('TipMNEE Content: Login Success Payload:', event.detail);
+  
+  // Handle various casing from API
+  const data = event.detail;
+  const token = data.AccessToken || data.accessToken || data.access_token || data.token;
+  const userId = data.UserID || data.userID || data.userId || data.user_id || data.id;
+
+  if (!token || !userId) {
+      console.warn('TipMNEE Content: Missing token or userId in response', data);
+  }
+  
+  // Save to Chrome Storage so Popup can see it
+  chrome.storage.local.set({ 
+    tipmnee_token: token, 
+    tipmnee_userid: userId,
+    tipmnee_is_logged_in: !!token
+  }, () => {
+    console.log('TipMNEE: Auth data saved to storage. UserID:', userId);
+  });
+});
+
+// Inject CSS
+const link = document.createElement('link');
+link.rel = 'stylesheet';
+link.href = chrome.runtime.getURL('src/content.css');
+document.head.appendChild(link);
+
 
 // Config
 const BUTTON_ID = 'tipmnee-tip-button';
