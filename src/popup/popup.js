@@ -15,10 +15,34 @@ document.addEventListener('DOMContentLoaded', () => {
   if (authButton) {
     authButton.addEventListener('click', async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab || !tab.id || !tab.url || tab.url.startsWith('chrome://')) {
-        alert('Cannot run on this page.'); return;
+      if (!tab || !tab.id || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) {
+        alert('This extension cannot run on this page.');
+        return;
       }
-      chrome.tabs.sendMessage(tab.id, { action: 'LOGIN_REQUEST' });
+
+      // Restore robust messaging with auto-injection
+      const sendLoginRequest = () => {
+        chrome.tabs.sendMessage(tab.id, { action: 'LOGIN_REQUEST' }, (response) => {
+          if (chrome.runtime.lastError) {
+              console.log('TipMNEE: Content script missing, injecting...');
+              chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                files: ['src/content.js']
+              }, () => {
+                  if (chrome.runtime.lastError) {
+                      alert('Please refresh the page to connect your wallet.');
+                  } else {
+                      // Small delay for script initialization
+                      setTimeout(() => {
+                        chrome.tabs.sendMessage(tab.id, { action: 'LOGIN_REQUEST' });
+                      }, 200);
+                  }
+              });
+          }
+        });
+      };
+
+      sendLoginRequest();
     });
   }
 
