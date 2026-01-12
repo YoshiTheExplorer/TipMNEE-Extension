@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Login Action
+  // Login Action (Blockchain)
   if (authButton) {
     authButton.addEventListener('click', async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -29,15 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Claim YouTube Action
+  // Claim YouTube Action (Global/OAuth)
   if (claimButton) {
     claimButton.addEventListener('click', async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab || !tab.id || !tab.url || !tab.url.includes('youtube.com')) {
-        alert('Please go to a YouTube page.'); return;
-      }
-
       try {
+        console.log('TipMNEE: Starting global claim flow...');
+        
+        // 1. Get Google OAuth Token
         const googleToken = await new Promise((resolve, reject) => {
           chrome.identity.getAuthToken({ interactive: true }, (token) => {
             if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
@@ -45,33 +43,45 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         });
 
-        chrome.tabs.sendMessage(tab.id, { action: 'CLAIM_REQUEST' }, async (response) => {
-          if (!response || !response.channelId) {
-            alert('Failed to extract Channel ID. Refresh YouTube and try again.'); return;
-          }
-
-          const { tipmnee_token } = await chrome.storage.local.get('tipmnee_token');
-          const verifyRes = await fetch(`${API_BASE_URL}/api/social/youtube/verify`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${tipmnee_token}`
-            },
-            body: JSON.stringify({
-              channel_id: response.channelId,
-              access_token: googleToken
-            })
-          });
-
-          if (verifyRes.ok) {
-            alert('YouTube Account Verified Successfully!');
-          } else {
-            const err = await verifyRes.json();
-            alert('Verification Failed: ' + (err.error || 'Unknown error'));
-          }
+        // 2. Automatically find the Channel ID using the token
+        console.log('TipMNEE: Discovering your YouTube channel...');
+        const ytResp = await fetch('https://www.googleapis.com/youtube/v3/channels?part=id&mine=true', {
+            headers: { 'Authorization': `Bearer ${googleToken}` }
         });
+        
+        const ytData = await ytResp.json();
+        
+        if (!ytData.items || ytData.items.length === 0) {
+            throw new Error('No YouTube channel found for this Google account.');
+        }
+
+        const autoChannelId = ytData.items[0].id;
+        console.log('TipMNEE: Found Channel ID:', autoChannelId);
+
+        // 3. Call your Backend Verify endpoint
+        const { tipmnee_token } = await chrome.storage.local.get('tipmnee_token');
+        const verifyRes = await fetch(`${API_BASE_URL}/api/social/youtube/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${tipmnee_token}`
+          },
+          body: JSON.stringify({
+            channel_id: autoChannelId,
+            access_token: googleToken
+          })
+        });
+
+        if (verifyRes.ok) {
+          alert('Success! Your YouTube account (' + autoChannelId + ') is now linked.');
+        } else {
+          const err = await verifyRes.json();
+          alert('Verification Failed: ' + (err.error || 'Unknown error'));
+        }
+
       } catch (err) {
-        alert('Google OAuth Failed: ' + err.message);
+        console.error('Claim failed:', err);
+        alert('Claiming failed: ' + err.message);
       }
     });
   }
