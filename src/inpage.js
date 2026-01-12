@@ -6,8 +6,8 @@ if (window.tipmnee_inpage_loaded) {
 } else {
     window.tipmnee_inpage_loaded = true;
 
-    const TOKEN_ADDRESS = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238'; // USDC on Sepolia
-    const ESCROW_ADDRESS = '0x327f29235e589F2977F5B667356C198d02Ad00c0';
+    const TOKEN_ADDRESS = '0x1c7d4b196cb0c7b01d743fbc6116a902379c7238'.toLowerCase(); 
+    const ESCROW_ADDRESS = '0x327f29235e589f2977f5b667356c198d02ad00c0'.toLowerCase();
     const API_BASE_URL = 'http://localhost:8080';
 
     function getChannelIdFromPage() {
@@ -89,17 +89,20 @@ if (window.tipmnee_inpage_loaded) {
             await approveTx.wait();
         }
 
-        const tipTx = await escrowContract.deposit(TOKEN_ADDRESS, amountBigInt, channelIdHash);
+        const tipTx = await escrowContract.tip(channelIdHash, amountBigInt, message);
         alert("Transaction 2/2 Sent: Tip. Please wait...");
         await tipTx.wait();
 
-        const { tipmnee_token } = await new Promise(r => chrome.storage.local.get('tipmnee_token', r));
-        await fetch(`${API_BASE_URL}/api/ledger/notify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tipmnee_token}` },
-          body: JSON.stringify({ tx_hash: tipTx.hash, channel_id: channelId, amount: amount, message: message })
-        });
-        alert('Success! Tip sent and registered.');
+        // 3. Notify Content Script to handle backend registration
+        window.dispatchEvent(new CustomEvent('TIPMNEE_TX_COMPLETED', {
+            detail: {
+                tx_hash: tipTx.hash,
+                channel_id: channelId,
+                amount: amount,
+                message: message
+            }
+        }));
+        alert('Success! Transaction confirmed on-chain.');
         
       } catch (error) {
         alert('TipMNEE Action Failed: ' + (error.shortMessage || error.message));

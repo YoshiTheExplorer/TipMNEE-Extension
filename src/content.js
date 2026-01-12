@@ -44,6 +44,40 @@ if (window.tipmnee_content_loaded) {
       });
     });
 
+    const API_BASE_URL = 'http://localhost:8080';
+    window.addEventListener('TIPMNEE_TX_COMPLETED', async (event) => {
+        const payload = event.detail;
+        console.log('TipMNEE Content: Transaction completed, notifying backend...', payload);
+
+        const { tipmnee_token } = await chrome.storage.local.get('tipmnee_token');
+        if (!tipmnee_token) {
+            console.error('TipMNEE: No auth token found, cannot notify backend.');
+            return;
+        }
+
+        try {
+            const resp = await fetch(`${API_BASE_URL}/api/ledger/notify`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Authorization': `Bearer ${tipmnee_token}` 
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (resp.ok) {
+                console.log('TipMNEE: Ledger notified successfully.');
+                alert('Tip Successfully Registered! Your dashboard will update shortly.');
+            } else {
+                const err = await resp.text();
+                console.error('TipMNEE: Failed to notify ledger:', err);
+                alert('Transaction confirmed but registration failed. Please contact support.');
+            }
+        } catch (e) {
+            console.error('TipMNEE: Network error notifying ledger:', e);
+        }
+    });
+
     // --- YouTube Specific Logic (Only runs on youtube.com) ---
     const BUTTON_ID = 'tipmnee-tip-button';
     const MODAL_ID = 'tipmnee-modal-overlay';
