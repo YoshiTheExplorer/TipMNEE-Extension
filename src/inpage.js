@@ -1,222 +1,117 @@
-// This script runs in the MAIN world, so it can access window.ethereum
-const { BrowserProvider, Contract, parseUnits, keccak256, toUtf8Bytes, encodePacked } = require('ethers');
-const { ESCROW_ABI, ERC20_ABI } = require('./abi');
+import { BrowserProvider, Contract, parseUnits, keccak256, toUtf8Bytes } from 'ethers';
+import { ERC20_ABI, ESCROW_ABI } from './abi';
 
-console.log('TipMNEE: inpage.js loaded (bundled with ethers)');
+if (window.tipmnee_inpage_loaded) {
+    // console.log('TipMNEE: Inpage script already loaded.');
+} else {
+    window.tipmnee_inpage_loaded = true;
 
-const TOKEN_ADDRESS = '0x291bcF208542fbeCD42030184c242Ac91F40B4Ae'; // ERC20 Token (Sepolia)
-const ESCROW_ADDRESS = '0x78B738bbdfa6efDdb817ffCf731F352fe5f780DF'; // Escrow Contract
+    const TOKEN_ADDRESS = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238'; // USDC on Sepolia
+    const ESCROW_ADDRESS = '0x327f29235e589F2977F5B667356C198d02Ad00c0';
+    const API_BASE_URL = 'http://localhost:8080';
 
-// --- Helper Functions ---
-
-function getChannelIdFromPage() {
-  try {
-    if (window.ytInitialPlayerResponse && 
-        window.ytInitialPlayerResponse.videoDetails && 
-        window.ytInitialPlayerResponse.videoDetails.channelId) {
-      return window.ytInitialPlayerResponse.videoDetails.channelId;
-    }
-    console.warn('TipMNEE: ytInitialPlayerResponse not found or missing channelId');
-    return null;
-  } catch (e) {
-    console.error('TipMNEE: Error extracting Channel ID', e);
-    return null;
-  }
-}
-
-// --- Login Flow ---
-
-window.addEventListener('TIPMNEE_LOGIN_REQUEST', async () => {
-  console.log('TipMNEE: Login Request Received');
-  const API_BASE_URL = 'http://localhost:8080';
-
-  if (!window.ethereum) {
-    alert('MetaMask is not installed!');
-    return;
-  }
-
-  try {
-    const provider = new BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
-    const address = await signer.getAddress();
-
-    console.log('TipMNEE: Authenticating address:', address);
-
-    // 1. Get Challenge Message
-    const msgResp = await fetch(`${API_BASE_URL}/api/auth/wallet/message`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address })
-    });
-    
-    if (!msgResp.ok) throw new Error('Failed to get auth message');
-    const { message } = await msgResp.json();
-    console.log('TipMNEE: Challenge Message:', message);
-
-    // 2. Sign Message
-    const signature = await signer.signMessage(message);
-    console.log('TipMNEE: Signature:', signature);
-
-    // 3. Login
-    const loginResp = await fetch(`${API_BASE_URL}/api/auth/wallet`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address, signature })
-    });
-
-    if (!loginResp.ok) {
-       const errorText = await loginResp.text();
-       throw new Error(`Login failed (${loginResp.status}): ${errorText}`);
-    }
-    const authData = await loginResp.json(); // Expected: { AccessToken, UserID }
-    
-    console.log('TipMNEE: Login Successful', authData);
-
-    // 4. Send Success Event back to ContentScript
-    window.dispatchEvent(new CustomEvent('TIPMNEE_LOGIN_SUCCESS', {
-      detail: authData
-    }));
-    
-    alert('Logged in successfully!');
-
-  } catch (error) {
-    console.error('TipMNEE: Login Error', error);
-    alert('Login Failed: ' + error.message);
-    
-    window.dispatchEvent(new CustomEvent('TIPMNEE_LOGIN_FAILURE', {
-      detail: { error: error.message }
-    }));
-  }
-});
-
-// --- Main Event Listener ---
-
-window.addEventListener('TIPMNEE_SEND_TIP', async (event) => {
-  const { amount, message } = event.detail;
-  const channelId = getChannelIdFromPage();
-  
-  console.log('TipMNEE: Initiating Tip', { amount, message, channelId });
-
-  if (!channelId) {
-    alert('TipMNEE Error: Could not find Channel ID on this page. Wait for video to load.');
-    return;
-  }
-
-  if (!window.ethereum) {
-    alert('TipMNEE: MetaMask is not installed!');
-    return;
-  }
-
-  try {
-    // 1. Setup Ethers Provider & Signer
-    const provider = new BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
-    
-    // 2. Network Check (Sepolia)
-    const network = await provider.getNetwork();
-    if (network.chainId !== 11155111n) { // Sepolia chainId
-       try {
-         await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0xaa36a7' }],
-        });
-       } catch (err) {
-         alert("Please switch to Sepolia network manually.");
-         return;
-       }
-    }
-
-    // 3. Contracts
-    const tokenContract = new Contract(TOKEN_ADDRESS, ERC20_ABI, signer);
-    const escrowContract = new Contract(ESCROW_ADDRESS, ESCROW_ABI, signer);
-
-    // 4. Conversion
-    const amountBigInt = parseUnits(amount, 18); // Assuming 18 decimals
-
-    // 5. Hash Channel ID 
-    const channelIdHash = keccak256(toUtf8Bytes(channelId));
-    console.log('TipMNEE: Computed Channel Hash:', channelIdHash);
-
-    // 6. Check Allowance 
-    const currentAllowance = await tokenContract.allowance(signer.address, ESCROW_ADDRESS);
-    console.log('TipMNEE: Current Allowance:', currentAllowance.toString());
-
-    if (currentAllowance < amountBigInt) {
-        console.log('TipMNEE: Approving...');
-        const approveTx = await tokenContract.approve(ESCROW_ADDRESS, amountBigInt);
-        console.log('TipMNEE: Approve Tx Sent:', approveTx.hash);
-        
-        // ALERT USER
-        alert("Transaction 1/2 Sent: Approve.\nPlease wait for confirmation...");
-        
-        // WAIT for mining
-        const receipt = await approveTx.wait();
-        console.log('TipMNEE: Approve Confirmed:', receipt);
-        alert("Transaction 1/2 Confirmed! Sending Tip now...");
-    } else {
-        console.log('TipMNEE: Sufficient allowance, skipping approve.');
-    }
-
-    // 7. Send Tip
-    console.log('TipMNEE: Sending Tip...');
-    const tipTx = await escrowContract.tip(channelIdHash, amountBigInt, message);
-    console.log('TipMNEE: Tip Tx Sent:', tipTx.hash);
-    
-    alert(`Transaction 2/2 Sent: Tip!\nHash: ${tipTx.hash}\n\nYou can track it on Sepolia Etherscan.`);
-    
-    // Optional: wait for final confirmation
-    await tipTx.wait();
-    console.log('TipMNEE: Tip Confirmed!');
-
-    // 8. Notify Backend
-    const API_BASE_URL = 'http://localhost:8080'; // TODO: Update this to your production API URL
-    const payload = {
-      tx_hash: tipTx.hash,
-      channel_id: channelId,
-      chain_id: Number(network.chainId)
-    };
-
-    console.log('TipMNEE: Notifying backend...', payload);
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/ledger/deposit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`);
+    function getChannelIdFromPage() {
+      try {
+        if (window.ytInitialPlayerResponse && window.ytInitialPlayerResponse.videoDetails) {
+          return window.ytInitialPlayerResponse.videoDetails.channelId;
+        }
+        const metaTag = document.querySelector('meta[itemprop="channelId"]');
+        if (metaTag) return metaTag.getAttribute('content');
+      } catch (e) {
+        console.error('TipMNEE: Failed to get Channel ID', e);
       }
-      
-      const responseData = await response.json();
-      console.log('TipMNEE: Backend notification successful', responseData);
-      alert('Success! Tip sent and registered.');
-      
-    } catch (apiError) {
-      console.error('TipMNEE: Failed to notify backend', apiError);
-      alert('Tip sent, but failed to register with backend. Please contact support with Tx Hash: ' + tipTx.hash);
+      return null;
     }
 
-  } catch (error) {
-    console.error('TipMNEE: Transaction failed', error);
-    alert('TipMNEE Action Failed: ' + (error.shortMessage || error.message));
-  }
-});
+    window.addEventListener('TIPMNEE_LOGIN_REQUEST', async () => {
+      try {
+        const provider = new BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        const signer = await provider.getSigner();
+        const address = await signer.getAddress();
+        
+        const msgResp = await fetch(`${API_BASE_URL}/api/auth/wallet/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address })
+        });
+        
+        if (!msgResp.ok) throw new Error('Failed to get auth message');
+        const msgData = await msgResp.json();
+        const messageToSign = msgData.canonical || msgData.message;
+        
+        const signature = await signer.signMessage(messageToSign);
+        
+        const loginResp = await fetch(`${API_BASE_URL}/api/auth/wallet`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address, signature })
+        });
 
-// --- Claim Flow ---
+        if (!loginResp.ok) {
+           const errorText = await loginResp.text();
+           throw new Error(`Login failed (${loginResp.status}): ${errorText}`);
+        }
+        const authData = await loginResp.json();
+        
+        window.dispatchEvent(new CustomEvent('TIPMNEE_LOGIN_SUCCESS', { detail: authData }));
+        alert('Logged in successfully!');
 
-window.addEventListener('TIPMNEE_CLAIM_REQUEST', async () => {
-    console.log('TipMNEE: Claim Request Received');
-    const channelId = getChannelIdFromPage();
+      } catch (error) {
+        console.error('TipMNEE: Login Error', error);
+        alert('Login Failed: ' + error.message);
+        window.dispatchEvent(new CustomEvent('TIPMNEE_LOGIN_FAILURE', { detail: { error: error.message } }));
+      }
+    });
 
-    if (!channelId) {
-        alert('Could not find YouTube Channel ID. Make sure you are on a video or channel page.');
-        return;
-    }
+    window.addEventListener('TIPMNEE_SEND_TIP', async (event) => {
+      const { amount, message } = event.detail;
+      const channelId = getChannelIdFromPage();
+      
+      try {
+        const provider = new BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const network = await provider.getNetwork();
+        
+        if (network.chainId !== 11155111n) {
+           await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xaa36a7' }] });
+        }
 
-    console.log('TipMNEE: Sending channel ID to extension:', channelId);
-    window.dispatchEvent(new CustomEvent('TIPMNEE_CHANNEL_ID_FOUND', { detail: { channelId } }));
-});
+        const tokenContract = new Contract(TOKEN_ADDRESS, ERC20_ABI, signer);
+        const escrowContract = new Contract(ESCROW_ADDRESS, ESCROW_ABI, signer);
+        const amountBigInt = parseUnits(amount, 18);
+        const channelIdHash = keccak256(toUtf8Bytes(channelId));
+
+        const currentAllowance = await tokenContract.allowance(signer.address, ESCROW_ADDRESS);
+        if (currentAllowance < amountBigInt) {
+            const approveTx = await tokenContract.approve(ESCROW_ADDRESS, amountBigInt);
+            alert("Transaction 1/2 Sent: Approve. Please wait...");
+            await approveTx.wait();
+        }
+
+        const tipTx = await escrowContract.deposit(TOKEN_ADDRESS, amountBigInt, channelIdHash);
+        alert("Transaction 2/2 Sent: Tip. Please wait...");
+        await tipTx.wait();
+
+        const { tipmnee_token } = await new Promise(r => chrome.storage.local.get('tipmnee_token', r));
+        await fetch(`${API_BASE_URL}/api/ledger/notify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tipmnee_token}` },
+          body: JSON.stringify({ tx_hash: tipTx.hash, channel_id: channelId, amount: amount, message: message })
+        });
+        alert('Success! Tip sent and registered.');
+        
+      } catch (error) {
+        alert('TipMNEE Action Failed: ' + (error.shortMessage || error.message));
+      }
+    });
+
+    window.addEventListener('TIPMNEE_CLAIM_REQUEST', async () => {
+        const channelId = getChannelIdFromPage();
+        if (!channelId) {
+            alert('Could not find YouTube Channel ID.');
+            return;
+        }
+        window.dispatchEvent(new CustomEvent('TIPMNEE_CHANNEL_ID_FOUND', { detail: { channelId } }));
+    });
+}
