@@ -88,7 +88,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (verifyRes.ok) {
-          alert('Success! Your YouTube account (' + autoChannelId + ') is now linked.');
+          chrome.storage.local.set({ tipmnee_is_youtube_verified: true }, () => {
+            alert('Success! Your YouTube account (' + autoChannelId + ') is now linked.');
+            showDashboard(); // Refresh UI
+          });
         } else {
           const errData = await verifyRes.json();
           console.error('TipMNEE: Verification backend error:', errData);
@@ -116,7 +119,16 @@ document.addEventListener('DOMContentLoaded', () => {
   async function showDashboard() {
     loginView.style.display = 'none';
     dashboardView.style.display = 'block';
-    const { tipmnee_token } = await chrome.storage.local.get('tipmnee_token');
+    
+    const { tipmnee_token, tipmnee_is_youtube_verified } = await chrome.storage.local.get(['tipmnee_token', 'tipmnee_is_youtube_verified']);
+    
+    // Hide claim button if already verified
+    if (tipmnee_is_youtube_verified) {
+      if (claimButton) claimButton.style.display = 'none';
+    } else {
+      if (claimButton) claimButton.style.display = 'block';
+    }
+
     const res = await fetch(`${API_BASE_URL}/api/me/earnings`, {
       headers: { 'Authorization': `Bearer ${tipmnee_token}` }
     });
