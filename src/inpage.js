@@ -217,8 +217,6 @@ window.addEventListener('TIPMNEE_CLAIM_REQUEST', async () => {
         return;
     }
 
-    console.log('TipMNEE: Claiming channel:', channelId);
-    
-    // Placeholder logic: You can add a fetch to POST /api/me/claim here
-    alert('Found Channel ID: ' + channelId + '\nClaim logic implementation pending...');
+    console.log('TipMNEE: Sending channel ID to extension:', channelId);
+    window.dispatchEvent(new CustomEvent('TIPMNEE_CHANNEL_ID_FOUND', { detail: { channelId } }));
 });

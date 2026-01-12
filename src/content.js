@@ -8,16 +8,20 @@ script.onload = function() {
 };
 (document.head || document.documentElement).appendChild(script);
 
-// 2. Messaging Bridge (Works on any site)
+// 2. Messaging Bridge 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'LOGIN_REQUEST') {
-    console.log('TipMNEE Content: Forwarding Login Request to Page');
     window.dispatchEvent(new CustomEvent('TIPMNEE_LOGIN_REQUEST'));
     sendResponse({ status: 'initiated' });
   } else if (request.action === 'CLAIM_REQUEST') {
-    console.log('TipMNEE Content: Forwarding Claim Request to Page');
+    // Listen for the response from inpage.js
+    const onIdFound = (e) => {
+        window.removeEventListener('TIPMNEE_CHANNEL_ID_FOUND', onIdFound);
+        sendResponse({ channelId: e.detail.channelId });
+    };
+    window.addEventListener('TIPMNEE_CHANNEL_ID_FOUND', onIdFound);
     window.dispatchEvent(new CustomEvent('TIPMNEE_CLAIM_REQUEST'));
-    sendResponse({ status: 'initiated' });
+    return true; // Keep channel open for async response
   }
 });
 

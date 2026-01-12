@@ -1,3 +1,5 @@
+const API_BASE_URL = 'http://localhost:8080';
+
 document.addEventListener('DOMContentLoaded', () => {
   console.log('TipMNEE Popup: Loaded');
   const loginView = document.getElementById('login-view');
@@ -7,34 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const logoutButton = document.getElementById('logout-button');
   const claimButton = document.getElementById('claim-button');
 
-  // ... (previous logic)
-
-  // Claim Action
-  if (claimButton) {
-    claimButton.addEventListener('click', async () => {
-      console.log('TipMNEE Popup: Claim Button Clicked');
-      
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
-      if (!tab || !tab.id || !tab.url || !tab.url.includes('youtube.com')) {
-        alert('Please go to your YouTube channel page to claim your account.');
-        return;
-      }
-
-      chrome.tabs.sendMessage(tab.id, { action: 'CLAIM_REQUEST' }, (response) => {
-        if (chrome.runtime.lastError) {
-           console.warn('TipMNEE Popup Error:', chrome.runtime.lastError.message);
-           alert('Could not connect to page. Please refresh the tab.');
-           return;
-        }
-        console.log('TipMNEE Popup: Sent claim request');
-      });
-    });
-  }
-
   // Check Login State
   chrome.storage.local.get(['tipmnee_is_logged_in', 'tipmnee_userid'], (result) => {
-    console.log('TipMNEE Popup: Storage state', result);
     if (result.tipmnee_is_logged_in) {
       showDashboard(result.tipmnee_userid);
     } else {
@@ -45,40 +21,58 @@ document.addEventListener('DOMContentLoaded', () => {
   // Login Action
   if (authButton) {
     authButton.addEventListener('click', async () => {
-      console.log('TipMNEE Popup: Auth Button Clicked');
-      
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
-      if (!tab || !tab.id || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) {
-        alert('This extension cannot run on this type of page.');
-        return;
+      if (!tab || !tab.id || !tab.url || tab.url.startsWith('chrome://')) {
+        alert('Cannot run on this page.'); return;
+      }
+      chrome.tabs.sendMessage(tab.id, { action: 'LOGIN_REQUEST' });
+    });
+  }
+
+  // Claim YouTube Action
+  if (claimButton) {
+    claimButton.addEventListener('click', async () => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab || !tab.id || !tab.url || !tab.url.includes('youtube.com')) {
+        alert('Please go to a YouTube page.'); return;
       }
 
-      const sendLoginRequest = () => {
-        chrome.tabs.sendMessage(tab.id, { action: 'LOGIN_REQUEST' }, (response) => {
-          if (chrome.runtime.lastError) {
-             console.log('TipMNEE: Initial connection failed, attempting injection...');
-             // Fallback: Inject the script manually if it's not there
-             chrome.scripting.executeScript({
-               target: { tabId: tab.id },
-               files: ['src/content.js']
-             }, () => {
-                if (chrome.runtime.lastError) {
-                    console.warn('Injection failed:', chrome.runtime.lastError.message);
-                    alert('Could not connect to page. Please refresh the tab.');
-                } else {
-                    setTimeout(() => {
-                        chrome.tabs.sendMessage(tab.id, { action: 'LOGIN_REQUEST' });
-                    }, 500);
-                }
-             });
-             return;
-          }
-          console.log('TipMNEE Popup: Sent request success');
+      try {
+        const googleToken = await new Promise((resolve, reject) => {
+          chrome.identity.getAuthToken({ interactive: true }, (token) => {
+            if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+            else resolve(token);
+          });
         });
-      };
 
-      sendLoginRequest();
+        chrome.tabs.sendMessage(tab.id, { action: 'CLAIM_REQUEST' }, async (response) => {
+          if (!response || !response.channelId) {
+            alert('Failed to extract Channel ID. Refresh YouTube and try again.'); return;
+          }
+
+          const { tipmnee_token } = await chrome.storage.local.get('tipmnee_token');
+          const verifyRes = await fetch(`${API_BASE_URL}/api/social/youtube/verify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${tipmnee_token}`
+            },
+            body: JSON.stringify({
+              channel_id: response.channelId,
+              access_token: googleToken
+            })
+          });
+
+          if (verifyRes.ok) {
+            alert('YouTube Account Verified Successfully!');
+          } else {
+            const err = await verifyRes.json();
+            alert('Verification Failed: ' + (err.error || 'Unknown error'));
+          }
+        });
+      } catch (err) {
+        alert('Google OAuth Failed: ' + err.message);
+      }
     });
   }
 
@@ -91,43 +85,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- Helpers ---
-
-  function formatCurrency(rawAmount) {
-      if (!rawAmount || rawAmount === "0") return "$0.00";
-      try {
-          const val = parseFloat(rawAmount) / 1e18; 
-          return "$" + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      } catch (e) {
-          return "$0.00";
-      }
+  // Helpers
+  function formatCurrency(raw) {
+    const val = parseFloat(raw || "0") / 1e18;
+    return "$" + val.toLocaleString('en-US', { minimumFractionDigits: 2 });
   }
 
-  async function showDashboard(userId) {
+  async function showDashboard() {
     loginView.style.display = 'none';
     dashboardView.style.display = 'block';
-    
-    try {
-        const { tipmnee_token } = await chrome.storage.local.get('tipmnee_token');
-        if (!tipmnee_token) return;
-
-        const API_BASE_URL = 'http://localhost:8080';
-        const res = await fetch(`${API_BASE_URL}/api/me/earnings`, {
-            headers: { 'Authorization': `Bearer ${tipmnee_token}` }
-        });
-        
-        if (res.ok) {
-            const data = await res.json();
-            const earned = data.EarnedRaw || data.earned_raw || "0";
-            const withdrawn = data.WithdrawnRaw || data.withdrawn_raw || "0";
-            const pending = data.PendingRaw || data.pending_raw || "0";
-
-            document.getElementById('total-earned-display').textContent = formatCurrency(earned);
-            document.getElementById('pending-display').textContent = formatCurrency(pending);
-            document.getElementById('withdrawn-display').textContent = formatCurrency(withdrawn);
-        }
-    } catch (err) {
-        console.error('Earnings fetch error:', err);
+    const { tipmnee_token } = await chrome.storage.local.get('tipmnee_token');
+    const res = await fetch(`${API_BASE_URL}/api/me/earnings`, {
+      headers: { 'Authorization': `Bearer ${tipmnee_token}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById('total-earned-display').textContent = formatCurrency(data.EarnedRaw || data.earned_raw);
+      document.getElementById('pending-display').textContent = formatCurrency(data.PendingRaw || data.pending_raw);
+      document.getElementById('withdrawn-display').textContent = formatCurrency(data.WithdrawnRaw || data.withdrawn_raw);
     }
   }
 

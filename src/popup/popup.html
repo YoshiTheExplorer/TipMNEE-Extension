@@ -5,16 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TipMNEE</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      width: 250px; /* Increased slightly */
+      font-family: 'Inter', -apple-system, sans-serif;
+      width: 250px;
       padding: 16px;
       margin: 0;
-      background-color: #f9f9f9;
-      color: #333;
+      background-color: #fcfcfc;
+      color: #1a1a1a;
     }
     .container {
       display: flex;
@@ -23,111 +21,103 @@
       text-align: center;
       width: 100%;
     }
-    header {
-      margin-bottom: 20px;
-      width: 100%;
+    header h1 {
+      margin: 0;
+      font-size: 24px;
+      background: linear-gradient(135deg, #FF0000 0%, #B30000 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
     }
-    .user-card {
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-      width: 100%;
-      margin-bottom: 16px;
-      text-align: center;
-    }
-    .card-label {
-        font-size: 12px;
-        color: #666;
-        margin: 0 0 4px 0;
-        text-transform: uppercase;
-        font-weight: 600;
-    }
-    .earnings-amount {
-        font-size: 36px;
-        margin: 0 0 16px 0;
-        color: #065fd4;
-        font-weight: 700;
-    }
-    .stats-row {
-        display: flex;
-        justify-content: center;
-        gap: 32px;
-        border-top: 1px solid #eee;
-        padding-top: 12px;
-    }
-    .stat-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    .stat-label {
-        font-size: 10px;
-        color: #888;
-    }
-    .stat-value {
-        font-size: 14px;
-        font-weight: 500;
-    }
-    .btn-secondary {
-      background: #eee;
-      color: #333;
+    .subtitle { margin: 2px 0 20px; font-size: 11px; color: #888; font-weight: 500; }
+    
+    .btn-primary {
+      background: #065fd4;
+      color: white;
       border: none;
-      padding: 8px 16px;
-      border-radius: 4px;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
+      width: 100%;
+      transition: opacity 0.2s;
     }
-    footer {
-      margin-top: 20px;
-      font-size: 12px;
+    .btn-primary:active { opacity: 0.8; }
+    
+    .btn-secondary {
+      background: transparent;
+      color: #666;
+      border: 1px solid #ddd;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 11px;
+      cursor: pointer;
+      margin-top: 12px;
     }
-    footer a {
-      color: #065fd4;
-      text-decoration: none;
+
+    .user-card {
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+      width: 100%;
+      margin-bottom: 20px;
+      border: 1px solid #f0f0f0;
     }
+    .card-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .earnings-amount { font-size: 32px; margin: 4px 0 16px; color: #065fd4; font-weight: 800; }
+    
+    .stats-row { display: flex; justify-content: center; gap: 24px; border-top: 1px solid #f5f5f5; padding-top: 12px; }
+    .stat-item { display: flex; flex-direction: column; align-items: center; }
+    .stat-label { font-size: 9px; color: #aaa; font-weight: 600; }
+    .stat-value { font-size: 13px; font-weight: 700; color: #333; }
+
+    .dashboard-actions { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+    .btn-claim { background: #1a1a1a; font-size: 12px; }
+    .btn-withdraw { background: #eee; color: #999; cursor: not-allowed; border: none; padding: 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+
+    footer { margin-top: 24px; font-size: 11px; }
+    footer a { color: #065fd4; text-decoration: none; font-weight: 500; }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
       <h1>TipMNEE</h1>
-      <p class="subtitle">Support your favorite creators</p>
+      <p class="subtitle">Creator Economy Platform</p>
     </header>
 
-    <!-- Login View -->
     <div id="login-view">
-      <button id="auth-button" class="btn-primary">
-        <span>🦊</span> &nbsp; Login with Wallet
-      </button>
-      <p class="helper-text">Connect MetaMask to start tipping</p>
+      <button id="auth-button" class="btn-primary">Connect Wallet</button>
+      <p style="font-size: 11px; color: #999; margin-top: 12px;">Web3 Authentication Required</p>
     </div>
 
-    <!-- Dashboard View (Hidden by default) -->
     <div id="dashboard-view" style="display: none;">
       <div class="user-card">
         <p class="card-label">Total Earned</p>
         <h2 id="total-earned-display" class="earnings-amount">$0.00</h2>
-        
         <div class="stats-row">
-            <div class="stat-item">
-                <span class="stat-label">Pending</span>
-                <span id="pending-display" class="stat-value">0.00</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Withdrawn</span>
-                <span id="withdrawn-display" class="stat-value">0.00</span>
-            </div>
+          <div class="stat-item">
+            <span class="stat-label">PENDING</span>
+            <span id="pending-display" class="stat-value">$0.00</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">WITHDRAWN</span>
+            <span id="withdrawn-display" class="stat-value">$0.00</span>
+          </div>
         </div>
       </div>
       
       <div class="dashboard-actions">
-        <button id="claim-button" class="btn-primary">Claim Youtube Account</button>
-        <button id="logout-button" class="btn-secondary">Logout</button>
+        <button id="claim-button" class="btn-primary btn-claim">Claim YouTube Channel</button>
+        <button class="btn-withdraw">Withdraw Funds</button>
+        <button id="logout-button" class="btn-secondary">Disconnect</button>
       </div>
     </div>
 
     <footer>
-      <a href="#" id="help-link">Need Help?</a>
+      <a href="https://tipmnee.com/help" target="_blank">Documentation & Support</a>
     </footer>
   </div>
   <script src="popup.js"></script>

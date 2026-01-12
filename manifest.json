@@ -1,13 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "TipMNEE",
-  "version": "1.0",
-  "description": "A simple Chrome Extension template.",
+  "name": "TipMNEE - Support Your Creators",
+  "version": "1.0.0",
+  "description": "Send tips to your favorite YouTube creators directly via crypto and manage your creator earnings.",
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "identity"
   ],
+  "oauth2": {
+    "client_id": "894402388292-ruvlnm0h77lq9ic90jfvs7tr38v680ht.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/youtube.readonly"
+    ]
+  },
   "host_permissions": [
     "<all_urls>"
   ],
